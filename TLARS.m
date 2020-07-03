@@ -9,7 +9,7 @@ function varargout = TLARS( Y, D_Cell_Array, Active_Columns_Limit, varargin )
 
 % If you use this code in a scientific publication, please cite following papers:
 
-% Wickramasingha, Ishan, Ahmed Elrewainy, Michael Sobhy, and Sherif S. Sherif. " Tensor Least Angle Regression for Sparse Representations of Multi-dimensional Signals." Neural computation (2020) (Accepted) 
+% Wickramasingha, Ishan, Ahmed Elrewainy, Michael Sobhy, and Sherif S. Sherif. " Tensor Least Angle Regression for Sparse Representations of Multi-dimensional Signals." Neural computation (2020) 
 % Elrewainy, A., & Sherif, S. S. (2019). Kronecker least angle regression for unsupervised unmixing of hyperspectral imaging data. Signal, Image and Video Processing, 14(2), 359–367. https://doi.org/10.1007/s11760-019-01562-w
 
 %% Function Call
