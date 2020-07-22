@@ -11,10 +11,9 @@ function [ dI, GInv] = getDirectionVector( GInv, zI, Gramian_Cell_Array, Active_
 
 %% References
 
-% If you use this code in a scientific publication, please cite following papers:
+% If you use this code in a scientific publication, please cite the following paper:
 
-% Wickramasingha, Ishan, Ahmed Elrewainy, Michael Sobhy, and Sherif S. Sherif. " Tensor Least Angle Regression for Sparse Representations of Multi-dimensional Signals." Neural computation (2020)
-% Elrewainy, A., & Sherif, S. S. (2019). Kronecker least angle regression for unsupervised unmixing of hyperspectral imaging data. Signal, Image and Video Processing, 14(2), 359–367. https://doi.org/10.1007/s11760-019-01562-w
+% Wickramasingha I, Elrewainy A, Sobhy M, Sherif SS. Tensor Least Angle Regression for Sparse Representations of Multidimensional Signals. Neural Comput. 2020;32(9):1-36. doi:10.1162/neco_a_01304
 
 %% Function Call
 %[ dI, GInv] = getDirectionVector( GInv, zI, Gramian_Cell_Array, Active_Columns, Add_Column_Flag, Changed_Column_Index, Changed_Active_Column_Index, Tensor_Dimensions, GPU_Computing );
