@@ -1,7 +1,8 @@
 function varargout = TLARS( Y, D_Cell_Array, Active_Columns_Limit, varargin )
-%TLARS v1.0.0
+%TLARS v1.1.0
 %Authors : Ishan Wickramasingha, Ahmed Elrewainy, Michael Sobhy, Sherif S. Sherif
 %Date : 2019/10/31
+%Modified Date : 2020/09/11
 
 %MATLAB Version : MATLAB R2017b and above
 
@@ -80,7 +81,11 @@ Precision_factor = 5;          %5*eps - Round to 5 times the default machine pre
 
 %Validate
 validateattributes(D_Cell_Array,{'cell'},{'nonempty'},algorithm,'D_cell_Array',2);
-validateattributes(Y,{'numeric'},{'nonempty','ndims', length(D_Cell_Array)},algorithm,'Y',1);
+if length(D_Cell_Array)>1
+    validateattributes(Y,{'numeric'},{'nonempty','ndims', length(D_Cell_Array)},algorithm,'Y',1);
+else
+    validateattributes(Y,{'numeric'},{'nonempty'},algorithm,'Y',1);
+end
 validateattributes(Active_Columns_Limit,{'numeric'},{'nonempty','positive'},algorithm,'Active_Columns_Limit',10);
 
 tensor_dim_array = size(Y);
@@ -136,6 +141,7 @@ end
 %% Define Variables
 plot_frequency = 100; %After every 100 iterations plot norm_R and image
 precision = Precision_factor*eps;
+precision_order = round(abs(log10(precision)));
 
 x = 0;
 Active_Columns = [];
@@ -143,7 +149,6 @@ Active_Columns = [];
 add_column_flag = -1;
 changed_dict_column_index = -1;
 changed_active_column_index = -1;
-prev_t_added_dict_column_index = -1;
 columnOperationStr = 'add';
 
 order = length(D_Cell_Array);
@@ -210,6 +215,7 @@ if nnz(X) > 0
      %Calculate the coeffiecint tensor and vectorize
     C = fullMultilinearProduct( R, D_Cell_Array, true, GPU_Computing ); % c = B'*r;
     c = gather(vec(C));
+    c = gpuRound(c, precision_order);
     clear R C;
     
     [lambda,changed_dict_column_index] = max(abs(c));
@@ -239,6 +245,7 @@ else
 
     C = fullMultilinearProduct( Y, D_Cell_Array, true, GPU_Computing ); % c = B'*r;
     c = gather(vec(C));
+    c = gpuRound(c, precision_order);
     clear C;
 
     [lambda,changed_dict_column_index] = max(abs(c)); %Initial lambda = max(c)
@@ -247,8 +254,6 @@ else
     add_column_flag = 1;
     Active_Columns = changed_dict_column_index;
     changed_active_column_index = 1;
-    prev_t_added_dict_column_index = changed_dict_column_index;   
-
 end
 
 %% TLARS Iterations
@@ -298,6 +303,7 @@ for t=1:Iterations
 
     %Create vector v by selecting equivalent active columns from the Gramian G and multiplying with dI 
      v = kroneckerMatrixPartialVectorProduct( gramian_cell_array, Active_Columns, dI, false, GPU_Computing );% v= D'*A*dI
+     v = gpuRound(v, precision_order);
 
 %% calculate delta_plus and delta_minus for every column 
     
@@ -333,13 +339,15 @@ for t=1:Iterations
         [min_delta_minus, col_idx3] = min(delta_minus);
         min_idx3 = Active_Columns(col_idx3);
 
-        if length(Active_Columns) > 1 && min_idx3 ~= prev_t_added_dict_column_index && min_delta_minus < delta
+        if length(Active_Columns) > 1 && min_delta_minus < delta
             changed_dict_column_index = gather(min_idx3);
             delta = full(min_delta_minus);
             add_column_flag = 0;
         end           
     end                                             
 
+    delta = gpuRound(delta,precision_order);
+    
     %% Compute the solution x and parameters for next iteration
 
     % Check for invalid conditions
@@ -350,8 +358,9 @@ for t=1:Iterations
 
     %Update the solution x
     x = x + delta*dI;    
-    lambda = lambda - delta; %lambda = max(c(active_columns));   
-    c = c - delta*v; %c = B'*r;
+    lambda = gpuRound(lambda - delta, precision_order); %lambda = max(c(active_columns));   
+    c = c - delta*v; %c = B'*r;    
+    c(Active_Columns) = lambda*sign(c(Active_Columns));
 
     %Update the norm of the residual
     ad = gather(kroneckerMatrixPartialVectorProduct( D_Cell_Array, Active_Columns, dI, false, GPU_Computing));%v = A*dI; 
@@ -384,7 +393,7 @@ for t=1:Iterations
     
     %Stopping criteria : If the stopping criteria is reached, stop the program and return results
     if nr < Tolerence || length(Active_Columns) >= Active_Columns_Limit
-        fprintf('\n%s stopping criteria reached \n%s Finished at: norm(r) = %d lambda = %d  delta = %d tolerence = %d Time = %.3f\n',algorithm,algorithm,nr,lambda,delta,Tolerence,toc);
+        fprintf('\n%s stopping criteria reached \n%s Finished at: t = %d norm(r) = %d lambda = %d  delta = %d tolerence = %d Time = %.3f\n',algorithm,algorithm,t,nr,lambda,delta,Tolerence,toc);
         break;
     end
     
@@ -393,18 +402,17 @@ for t=1:Iterations
         Active_Columns = [Active_Columns; changed_dict_column_index];
         x = [x; 0];
         changed_active_column_index = length(x);
-        prev_t_added_dict_column_index = changed_dict_column_index;
         columnOperationStr = 'add';
     else
         changed_active_column_index = find(Active_Columns == changed_dict_column_index);
         x(changed_active_column_index)  = [];
         Active_Columns(changed_active_column_index) = [];
-        prev_t_added_dict_column_index = -1;
         columnOperationStr = 'remove';
     end    
 
     %Handle exception
     catch e
+        fprintf(2,'Exception Occured.\nException = %s \n', getReport(e));
         if t >1
             
             X = constructCoreTensor(Active_Columns, x, core_tensor_dimensions);
